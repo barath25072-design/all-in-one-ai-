@@ -1,18 +1,262 @@
-const $=id=>document.getElementById(id);
-let language='en', chats=[], current=[];
-const prompt=$('prompt'), messages=$('messages'), welcome=$('welcome'), fileInput=$('fileInput');
-function t(en,ta){return language==='ta'?ta:en}
-function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2300)}
-function setLanguage(lang){language=lang;$('enBtn').classList.toggle('active',lang==='en');$('taBtn').classList.toggle('active',lang==='ta');document.documentElement.lang=lang;document.querySelectorAll('[data-en]').forEach(el=>{el.textContent=el.dataset[lang]});prompt.placeholder=prompt.dataset['placeholder'+(lang==='en'?'En':'Ta')];}
-$('enBtn').onclick=()=>setLanguage('en');$('taBtn').onclick=()=>setLanguage('ta');
-function addMessage(role,text){welcome.style.display='none';const wrap=document.createElement('div');wrap.className='message '+role;const body=document.createElement('div');body.textContent=text;wrap.appendChild(body);if(role==='assistant'){const actions=document.createElement('div');actions.className='message-actions';const copy=document.createElement('button');copy.textContent=t('Copy','நகலெடு');copy.onclick=async()=>{try{await navigator.clipboard.writeText(text);toast(t('Copied','நகலெடுக்கப்பட்டது'))}catch(e){toast(t('Copy not available in this browser','நகலெடுக்க முடியவில்லை'))}};const share=document.createElement('button');share.textContent=t('Share','பகிர்');share.onclick=async()=>{if(navigator.share){try{await navigator.share({text})}catch(e){}}else toast(t('Sharing is not supported here','பகிர்வு வசதி இல்லை'))};actions.append(copy,share);wrap.appendChild(actions)}messages.appendChild(wrap);messages.scrollTop=messages.scrollHeight;return wrap}
-function renderHistory(){const h=$('history');h.innerHTML='';if(!chats.length){const p=document.createElement('p');p.className='empty-history';p.textContent=t('Your chats will appear here.','உங்கள் உரையாடல்கள் இங்கே தோன்றும்.');h.appendChild(p);return}chats.slice().reverse().forEach(c=>{const b=document.createElement('button');b.className='history-item';b.textContent=c.title;b.onclick=()=>toast(t('Local demo history only','உள்ளூர் மாதிரி History மட்டும்'));h.appendChild(b)})}
-function newChat(){if(current.length)chats.push({title:current[0].slice(0,32),items:current});current=[];messages.innerHTML='';welcome.style.display='block';renderHistory();$('sidebar').classList.remove('open')}
-$('newChat').onclick=newChat;$('menuBtn').onclick=()=>$('sidebar').classList.toggle('open');
-function send(){const text=prompt.value.trim();if(!text)return;addMessage('user',text);current.push(text);prompt.value='';prompt.style.height='auto';const reply=language==='ta'?'இது தற்போது வடிவமைப்பு மாதிரி (Demo). உண்மையான AI பதில்களைப் பெற பாதுகாப்பான Backend மற்றும் AI API இணைக்கப்பட வேண்டும்.':'This is currently a UI prototype. To receive real AI answers, we need to connect a secure backend and an AI API.';setTimeout(()=>{addMessage('assistant',reply);current.push(reply)},350)}
-$('sendBtn').onclick=send;prompt.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});prompt.addEventListener('input',()=>{prompt.style.height='auto';prompt.style.height=Math.min(prompt.scrollHeight,130)+'px'});
-document.querySelectorAll('.suggestion').forEach(b=>b.onclick=()=>{prompt.value=b.dataset['prompt'+(language==='en'?'En':'Ta')];prompt.focus()});
-$('attachBtn').onclick=()=>fileInput.click();fileInput.onchange=()=>{const box=$('attachmentPreview');box.innerHTML='';[...fileInput.files].forEach(f=>{const chip=document.createElement('span');chip.className='file-chip';chip.textContent='📎 '+f.name;box.appendChild(chip)});if(fileInput.files.length)toast(t('Files selected. Upload processing is not connected yet.','கோப்புகள் தேர்வு செய்யப்பட்டன. Upload செயல்பாடு இன்னும் இணைக்கப்படவில்லை.'))};
-$('micBtn').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast(t('Voice input is not supported by this browser.','இந்த Browser-ல் Voice வசதி இல்லை.'));return}const r=new SR();r.lang=language==='ta'?'ta-IN':'en-IN';r.onresult=e=>{prompt.value+=(prompt.value?' ':'')+e.results[0][0].transcript};r.onerror=()=>toast(t('Microphone permission or speech error.','Microphone அனுமதி அல்லது Voice பிழை.'));r.start()};
-if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+const $ = id => document.getElementById(id);
+
+let language = 'en', chats = [], current = [];
+
+const prompt = $('prompt');
+const messages = $('messages');
+const welcome = $('welcome');
+const fileInput = $('fileInput');
+
+function t(en, ta) {
+  return language === 'ta' ? ta : en;
+}
+
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2300);
+}
+
+function setLanguage(lang) {
+  language = lang;
+  $('enBtn').classList.toggle('active', lang === 'en');
+  $('taBtn').classList.toggle('active', lang === 'ta');
+  document.documentElement.lang = lang;
+
+  document.querySelectorAll('[data-en]').forEach(el => {
+    el.textContent = el.dataset[lang];
+  });
+
+  prompt.placeholder = prompt.dataset[
+    'placeholder' + (lang === 'en' ? 'En' : 'Ta')
+  ];
+}
+
+$('enBtn').onclick = () => setLanguage('en');
+$('taBtn').onclick = () => setLanguage('ta');
+
+function addMessage(role, text) {
+  welcome.style.display = 'none';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'message ' + role;
+
+  const body = document.createElement('div');
+  body.textContent = text;
+  wrap.appendChild(body);
+
+  if (role === 'assistant') {
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+
+    const copy = document.createElement('button');
+    copy.textContent = t('Copy', 'நகலெடு');
+
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast(t('Copied', 'நகலெடுக்கப்பட்டது'));
+      } catch (e) {
+        toast(t('Copy not available in this browser', 'நகலெடுக்க முடியவில்லை'));
+      }
+    };
+
+    const share = document.createElement('button');
+    share.textContent = t('Share', 'பகிர்');
+
+    share.onclick = async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({ text });
+        } catch (e) {}
+      } else {
+        toast(t('Sharing is not supported here', 'பகிர்வு வசதி இல்லை'));
+      }
+    };
+
+    actions.append(copy, share);
+    wrap.appendChild(actions);
+  }
+
+  messages.appendChild(wrap);
+  messages.scrollTop = messages.scrollHeight;
+  return wrap;
+}
+
+function renderHistory() {
+  const h = $('history');
+  h.innerHTML = '';
+
+  if (!chats.length) {
+    const p = document.createElement('p');
+    p.className = 'empty-history';
+    p.textContent = t(
+      'Your chats will appear here.',
+      'உங்கள் உரையாடல்கள் இங்கே தோன்றும்.'
+    );
+    h.appendChild(p);
+    return;
+  }
+
+  chats.slice().reverse().forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'history-item';
+    b.textContent = c.title;
+    b.onclick = () => toast(
+      t('Local demo history only', 'உள்ளூர் மாதிரி History மட்டும்')
+    );
+    h.appendChild(b);
+  });
+}
+
+function newChat() {
+  if (current.length) {
+    chats.push({
+      title: current[0].slice(0, 32),
+      items: current
+    });
+  }
+
+  current = [];
+  messages.innerHTML = '';
+  welcome.style.display = 'block';
+  renderHistory();
+  $('sidebar').classList.remove('open');
+}
+
+$('newChat').onclick = newChat;
+$('menuBtn').onclick = () => $('sidebar').classList.toggle('open');
+
+// REAL AI BACKEND CONNECTION
+async function send() {
+  const text = prompt.value.trim();
+  if (!text) return;
+
+  addMessage('user', text);
+  current.push(text);
+
+  prompt.value = '';
+  prompt.style.height = 'auto';
+
+  const loading = addMessage(
+    'assistant',
+    t('Thinking...', 'யோசிக்கிறேன்...')
+  );
+
+  try {
+    const response = await fetch(
+      'https://all-in-one-ai-backend.barath25072.workers.dev/',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'user', content: text }
+          ]
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'AI request failed');
+    }
+
+    const reply = data.reply || 'No response received.';
+
+    loading.remove();
+    addMessage('assistant', reply);
+    current.push(reply);
+
+  } catch (error) {
+    loading.remove();
+    addMessage(
+      'assistant',
+      'Error: ' + error.message
+    );
+  }
+}
+
+$('sendBtn').onclick = send;
+
+prompt.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+
+prompt.addEventListener('input', () => {
+  prompt.style.height = 'auto';
+  prompt.style.height = Math.min(prompt.scrollHeight, 130) + 'px';
+});
+
+document.querySelectorAll('.suggestion').forEach(b => {
+  b.onclick = () => {
+    prompt.value = b.dataset[
+      'prompt' + (language === 'en' ? 'En' : 'Ta')
+    ];
+    prompt.focus();
+  };
+});
+
+$('attachBtn').onclick = () => fileInput.click();
+
+fileInput.onchange = () => {
+  const box = $('attachmentPreview');
+  box.innerHTML = '';
+
+  [...fileInput.files].forEach(f => {
+    const chip = document.createElement('span');
+    chip.className = 'file-chip';
+    chip.textContent = '📎 ' + f.name;
+    box.appendChild(chip);
+  });
+
+  if (fileInput.files.length) {
+    toast(t(
+      'Files selected. Upload processing is not connected yet.',
+      'கோப்புகள் தேர்வு செய்யப்பட்டன. Upload செயல்பாடு இன்னும் இணைக்கப்படவில்லை.'
+    ));
+  }
+};
+
+$('micBtn').onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SR) {
+    toast(t(
+      'Voice input is not supported by this browser.',
+      'இந்த Browser-ல் Voice வசதி இல்லை.'
+    ));
+    return;
+  }
+
+  const r = new SR();
+  r.lang = language === 'ta' ? 'ta-IN' : 'en-IN';
+
+  r.onresult = e => {
+    prompt.value += (prompt.value ? ' ' : '') +
+      e.results[0][0].transcript;
+  };
+
+  r.onerror = () => {
+    toast(t(
+      'Microphone permission or speech error.',
+      'Microphone அனுமதி அல்லது Voice பிழை.'
+    ));
+  };
+
+  r.start();
+};
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
 renderHistory();
