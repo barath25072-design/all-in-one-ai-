@@ -1,0 +1,10 @@
+{
+  "name": "All in One AI",
+  "short_name": "All in One AI",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#090914",
+  "theme_color": "#090914",
+  "description": "Bilingual AI assistant starter app",
+  "icons": []
+}
